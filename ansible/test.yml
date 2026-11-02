@@ -1,0 +1,12 @@
+- hosts: srl
+  gather_facts: false
+  tasks:
+    - name: Leer la versión
+      nokia.srlinux.get:
+        paths:
+          - path: /system/information/version
+            datastore: state
+      register: r
+
+    - debug:
+        var: r.result

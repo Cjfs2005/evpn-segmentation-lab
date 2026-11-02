@@ -1,0 +1,7 @@
+# Definición global de segmentos. Para agregar uno, añade un bloque aquí
+# y asigna un puerto en host_vars/<leaf>.yml
+segments:
+  corp:
+    vni: 10010
+  iot:
+    vni: 10020

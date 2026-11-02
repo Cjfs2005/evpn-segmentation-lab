@@ -1,0 +1,109 @@
+- name: Configuración base del fabric (underlay OSPF + overlay iBGP EVPN)
+  hosts: srl
+  gather_facts: false
+  tasks:
+    # ---------- Interfaces ----------
+    - name: Enlaces de fabric (IP punto a punto)
+      nokia.srlinux.config:
+        update:
+          - path: "/interface[name={{ item.key }}]"
+            value:
+              admin-state: enable
+              subinterface:
+                - index: 0
+                  admin-state: enable
+                  ipv4:
+                    admin-state: enable
+                    address:
+                      - ip-prefix: "{{ item.value }}"
+      loop: "{{ fabric_links | dict2items }}"
+
+    - name: Loopback system0 (origen del VTEP)
+      nokia.srlinux.config:
+        update:
+          - path: "/interface[name=system0]"
+            value:
+              admin-state: enable
+              subinterface:
+                - index: 0
+                  admin-state: enable
+                  ipv4:
+                    admin-state: enable
+                    address:
+                      - ip-prefix: "{{ loopback }}"
+
+    - name: Asociar interfaces al network-instance default
+      nokia.srlinux.config:
+        update:
+          - path: "/network-instance[name=default]"
+            value:
+              interface:
+                - name: "{{ item }}.0"
+      loop: "{{ fabric_links.keys() | list + ['system0'] }}"
+
+    # ---------- Underlay: OSPF ----------
+    - name: OSPF instancia
+      nokia.srlinux.config:
+        update:
+          - path: "/network-instance[name=default]/protocols/ospf/instance[name=main]"
+            value:
+              admin-state: enable
+              version: ospf-v2
+              router-id: "{{ router_id }}"
+
+    - name: OSPF en enlaces de fabric
+      nokia.srlinux.config:
+        update:
+          - path: "/network-instance[name=default]/protocols/ospf/instance[name=main]/area[area-id=0.0.0.0]/interface[interface-name={{ item }}.0]"
+            value:
+              interface-type: point-to-point
+      loop: "{{ fabric_links.keys() | list }}"
+
+    - name: OSPF en loopback (pasivo)
+      nokia.srlinux.config:
+        update:
+          - path: "/network-instance[name=default]/protocols/ospf/instance[name=main]/area[area-id=0.0.0.0]/interface[interface-name=system0.0]"
+            value:
+              passive: true
+
+    # ---------- Overlay: iBGP EVPN ----------
+    - name: BGP base (AS, router-id, familia EVPN)
+      nokia.srlinux.config:
+        update:
+          - path: "/network-instance[name=default]/protocols/bgp"
+            value:
+              admin-state: enable
+              autonomous-system: "{{ asn | int }}"
+              router-id: "{{ router_id }}"
+              afi-safi:
+                - afi-safi-name: evpn
+                  admin-state: enable
+
+    - name: Grupo BGP (con route-reflector solo en el spine)
+      vars:
+        group_base:
+          peer-as: "{{ asn | int }}"
+          afi-safi:
+            - afi-safi-name: evpn
+              admin-state: enable
+            - afi-safi-name: ipv4-unicast
+              admin-state: disable
+          transport:
+            local-address: "{{ router_id }}"
+        rr_extra:
+          route-reflector:
+            client: true
+            cluster-id: "{{ router_id }}"
+      nokia.srlinux.config:
+        update:
+          - path: "/network-instance[name=default]/protocols/bgp/group[group-name={{ bgp_group }}]"
+            value: "{{ group_base | combine(rr_extra if route_reflector else {}) }}"
+
+    - name: Vecinos BGP
+      nokia.srlinux.config:
+        update:
+          - path: "/network-instance[name=default]/protocols/bgp/neighbor[peer-address={{ item }}]"
+            value:
+              admin-state: enable
+              peer-group: "{{ bgp_group }}"
+      loop: "{{ bgp_peers }}"

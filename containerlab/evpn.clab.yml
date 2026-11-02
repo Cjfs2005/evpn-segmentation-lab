@@ -1,0 +1,22 @@
+name: evpn-poc # NO cambiar: de aquí salen los nombres clab-evpn-poc-* del inventario Ansible
+topology:
+  kinds:
+    nokia_srlinux:
+      image: ghcr.io/nokia/srlinux:26.7.2-519 # fija un tag concreto cuando tengas la versión definitiva
+    linux:
+      image: ghcr.io/srl-labs/network-multitool:sha-8d1f081
+  nodes:
+    spine1: { kind: nokia_srlinux }
+    leaf1: { kind: nokia_srlinux }
+    leaf2: { kind: nokia_srlinux }
+    h1: { kind: linux } # corp en leaf1
+    h2: { kind: linux } # corp en leaf2
+    h3: { kind: linux } # iot en leaf1
+    h4: { kind: linux } # iot en leaf2
+  links:
+    - endpoints: ["spine1:e1-1", "leaf1:e1-49"]
+    - endpoints: ["spine1:e1-2", "leaf2:e1-49"]
+    - endpoints: ["leaf1:e1-1", "h1:eth1"]
+    - endpoints: ["leaf1:e1-2", "h3:eth1"]
+    - endpoints: ["leaf2:e1-1", "h2:eth1"]
+    - endpoints: ["leaf2:e1-2", "h4:eth1"]

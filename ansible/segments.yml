@@ -1,0 +1,54 @@
+- name: Aplicar segmentos EVPN en los leafs
+  hosts: leafs
+  gather_facts: false
+  tasks:
+    # Una tarea por segmento usado en este leaf: VXLAN + mac-vrf + EVPN
+    - name: "Crear segmento (vxlan-interface + mac-vrf + EVPN)"
+      nokia.srlinux.config:
+        update:
+          - path: "/tunnel-interface[name=vxlan1]/vxlan-interface[index={{ segments[item].vni }}]"
+            value:
+              type: bridged
+              ingress:
+                vni: "{{ segments[item].vni | int }}"
+          - path: "/network-instance[name=mac-vrf-{{ item }}]"
+            value:
+              type: mac-vrf
+              admin-state: enable
+              vxlan-interface:
+                - name: "vxlan1.{{ segments[item].vni }}"
+              protocols:
+                bgp-evpn:
+                  bgp-instance:
+                    - id: 1
+                      admin-state: enable
+                      vxlan-interface: "vxlan1.{{ segments[item].vni }}"
+                      evi: "{{ segments[item].vni | int }}"
+                bgp-vpn:
+                  bgp-instance:
+                    - id: 1
+                      route-target:
+                        export-rt: "target:{{ asn }}:{{ segments[item].vni }}"
+                        import-rt: "target:{{ asn }}:{{ segments[item].vni }}"
+      loop: "{{ access_ports.values() | unique | list }}"
+
+    # Una tarea por puerto de acceso: interfaz + membresía en el mac-vrf
+    - name: "Configurar puerto de acceso y asociarlo al segmento"
+      nokia.srlinux.config:
+        update:
+          - path: "/interface[name={{ item.key }}]"
+            value:
+              admin-state: enable
+              vlan-tagging: true
+              subinterface:
+                - index: 0
+                  type: bridged
+                  admin-state: enable
+                  vlan:
+                    encap:
+                      untagged: {}
+          - path: "/network-instance[name=mac-vrf-{{ item.value }}]"
+            value:
+              interface:
+                - name: "{{ item.key }}.0"
+      loop: "{{ access_ports | dict2items }}"

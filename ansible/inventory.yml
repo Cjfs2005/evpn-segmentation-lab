@@ -1,0 +1,22 @@
+all:
+  children:
+    srl:
+      children:
+        spines:
+          hosts:
+            spine1:
+              ansible_host: clab-evpn-poc-spine1
+        leafs:
+          hosts:
+            leaf1:
+              ansible_host: clab-evpn-poc-leaf1
+            leaf2:
+              ansible_host: clab-evpn-poc-leaf2
+      vars:
+        ansible_connection: ansible.netcommon.httpapi
+        ansible_network_os: nokia.srlinux.srlinux
+        ansible_user: admin
+        ansible_password: "NokiaSrl1!"
+        ansible_httpapi_use_ssl: true
+        ansible_httpapi_validate_certs: false
+        ansible_httpapi_port: 443

@@ -1,0 +1,11 @@
+router_id: 10.0.0.11
+loopback: 10.0.0.11/32
+fabric_links:
+  ethernet-1/49: 10.1.1.1/31
+bgp_group: spine
+bgp_peers: [10.0.0.1]
+route_reflector: false
+
+access_ports:
+  ethernet-1/1: corp
+  ethernet-1/2: iot
